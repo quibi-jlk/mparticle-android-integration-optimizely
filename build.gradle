@@ -1,0 +1,27 @@
+buildscript {
+    repositories {
+        google()
+        mavenLocal()
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.mparticle:android-kit-plugin:' + project.version
+    }
+}
+
+apply plugin: 'com.mparticle.kit'
+
+android {
+    defaultConfig {
+        minSdkVersion 14
+    }
+}
+
+dependencies {
+    implementation 'com.optimizely.ab:android-sdk:2.1.0'
+
+    testImplementation 'junit:junit:4.12'
+    testImplementation  files('libs/java-json.jar')
+    testImplementation 'org.mockito:mockito-core:2.7.22'
+    testImplementation project(':testutils')
+}
