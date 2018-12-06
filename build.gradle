@@ -18,10 +18,10 @@ android {
 }
 
 dependencies {
-    implementation 'com.optimizely.ab:android-sdk:2.1.0'
+    implementation 'com.optimizely.ab:android-sdk:3.0.0'
 
     testImplementation 'junit:junit:4.12'
     testImplementation  files('libs/java-json.jar')
-    testImplementation 'org.mockito:mockito-core:2.7.22'
+    testImplementation 'org.mockito:mockito-core:2.18.3'
     testImplementation project(':testutils')
 }
