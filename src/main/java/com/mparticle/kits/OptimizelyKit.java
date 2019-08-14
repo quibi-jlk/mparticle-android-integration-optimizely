@@ -166,8 +166,14 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         String customEventName = null;
         String customUserId = null;
         if (commerceEvent.getCustomFlags() != null) {
-            customEventName = commerceEvent.getCustomFlags().get(OPTIMIZELY_EVENT_NAME);
-            customUserId = commerceEvent.getCustomFlags().get(OPTIMIZELY_USER_ID);
+            List<String> eventNameFlags = commerceEvent.getCustomFlags().get(OPTIMIZELY_EVENT_NAME);
+            List<String>userIdFlags = commerceEvent.getCustomFlags().get(OPTIMIZELY_USER_ID);
+            if (eventNameFlags != null) {
+                customEventName = eventNameFlags.get(0);
+            }
+            if (userIdFlags != null) {
+                customUserId = userIdFlags.get(0);
+            }
         }
 
         List<MPEvent> events = CommerceEventUtils.expand(commerceEvent);
