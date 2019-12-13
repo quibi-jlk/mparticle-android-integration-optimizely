@@ -340,7 +340,7 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         }
     }
 
-    interface OptimizelyClientListener {
+    public interface OptimizelyClientListener {
         void onOptimizelyClientAvailable(OptimizelyClient optimizelyClient);
     }
 }
