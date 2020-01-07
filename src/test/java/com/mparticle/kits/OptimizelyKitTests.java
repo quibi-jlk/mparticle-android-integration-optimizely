@@ -1,13 +1,19 @@
 package com.mparticle.kits;
 
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 import com.mparticle.MPEvent;
 import com.mparticle.MParticle;
+import com.mparticle.UserAttributeListener;
+import com.mparticle.commerce.Cart;
 import com.mparticle.commerce.CommerceEvent;
 import com.mparticle.commerce.Impression;
 import com.mparticle.commerce.Product;
 import com.mparticle.commerce.Promotion;
 import com.mparticle.commerce.TransactionAttributes;
+import com.mparticle.consent.ConsentState;
 import com.mparticle.identity.IdentityApi;
 import com.mparticle.identity.MParticleUser;
 import com.mparticle.mock.MockContext;
@@ -49,12 +55,10 @@ public class OptimizelyKitTests {
     public void before() {
         MParticle mockMParticle = Mockito.mock(MParticle.class);
         IdentityApi mockIdentityApi = Mockito.mock(IdentityApi.class);
-        MParticleUser mockUser = Mockito.mock(MParticleUser.class);
+        MParticleUser mockUser = new EmptyMParticleUser();
         Mockito.when(mockMParticle.Identity()).thenReturn(mockIdentityApi);
         Mockito.when(mockMParticle.getEnvironment()).thenReturn(MParticle.Environment.Development);
         Mockito.when(mockIdentityApi.getCurrentUser()).thenReturn(mockUser);
-        Mockito.when(mockUser.getId()).thenReturn(1L);
-        Mockito.when(mockUser.getUserAttributes()).thenReturn(new HashMap<String, Object>());
         MParticle.setInstance(mockMParticle);
     }
 
@@ -122,16 +126,29 @@ public class OptimizelyKitTests {
                 .build();
 
 
-        Long mpid = new Random().nextLong();
+        final Long mpid = new Random().nextLong();
         String customerId = randomUtils.getAlphaNumericString(20);
         String email = randomUtils.getAlphaNumericString(10);
 
-        Map<MParticle.IdentityType, String> identities = new HashMap<>();
+        final Map<MParticle.IdentityType, String> identities = new HashMap<>();
         identities.put(MParticle.IdentityType.CustomerId, customerId);
         identities.put(MParticle.IdentityType.Email, email);
 
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getUserIdentities()).thenReturn(identities);
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getId()).thenReturn(mpid);
+        MParticleUser user = new EmptyMParticleUser() {
+            @NonNull
+            @Override
+            public Map<MParticle.IdentityType, String> getUserIdentities() {
+                return identities;
+            }
+
+            @NonNull
+            @Override
+            public long getId() {
+                return mpid;
+            }
+        };
+
+        Mockito.when(MParticle.getInstance().Identity().getCurrentUser()).thenReturn(user);
 
         final Mutable<String> expectedUserId = new Mutable<String>("");
         final Mutable<Integer> count = new Mutable<>(0);
@@ -252,8 +269,16 @@ public class OptimizelyKitTests {
      */
     @Test
     public void testCommerceEventNoCustom() {
-        final Map<String, Object> userAttributes = randomUtils.getRandomUserAttributes(4);
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getUserAttributes()).thenReturn(userAttributes);
+        final Map<String, String> userAttributes = randomUtils.getRandomAttributes(4);
+        MParticleUser user = new EmptyMParticleUser() {
+            @Nullable
+            @Override
+            public Map<String, Object> getUserAttributes(@Nullable UserAttributeListener userAttributeListener) {
+                userAttributeListener.onUserAttributesReceived(userAttributes, new HashMap<String, List<String>>(), 1L);
+                return null;
+            }
+        };
+        Mockito.when(MParticle.getInstance().Identity().getCurrentUser()).thenReturn(user);
 
 
         Product product1 = new Product.Builder("product1", "1234", 0.0).build();
@@ -285,8 +310,16 @@ public class OptimizelyKitTests {
      */
     @Test
     public void testCommerceEventRevenue() {
-        final Map<String, Object> userAttributes = randomUtils.getRandomUserAttributes(4);
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getUserAttributes()).thenReturn(userAttributes);
+        final Map<String, String> userAttributes = randomUtils.getRandomAttributes(4);
+        MParticleUser user = new EmptyMParticleUser() {
+            @Nullable
+            @Override
+            public Map<String, Object> getUserAttributes(@Nullable UserAttributeListener userAttributeListener) {
+                userAttributeListener.onUserAttributesReceived(userAttributes, new HashMap<String, List<String>>(), 1L);
+                return null;
+            }
+        };
+        Mockito.when(MParticle.getInstance().Identity().getCurrentUser()).thenReturn(user);
 
         Map<String, String> customAttributes = randomUtils.getRandomAttributes(3);
         customAttributes.put(OptimizelyKit.OPTIMIZELY_EVENT_NAME, "myCustomName1");
@@ -384,9 +417,16 @@ public class OptimizelyKitTests {
      */
     @Test
     public void testQueueWorking() {
-        final Map<String, Object> userAttributes = randomUtils.getRandomUserAttributes(4);
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getUserAttributes()).thenReturn(userAttributes);
-        Mockito.when(MParticle.getInstance().Identity().getCurrentUser().getId()).thenReturn(1L);
+        final Map<String, String> userAttributes = randomUtils.getRandomAttributes(4);
+        MParticleUser user = new EmptyMParticleUser() {
+            @Nullable
+            @Override
+            public Map<String, Object> getUserAttributes(@Nullable UserAttributeListener userAttributeListener) {
+                userAttributeListener.onUserAttributesReceived(userAttributes, new HashMap<String, List<String>>(), 1L);
+                return null;
+            }
+        };
+        Mockito.when(MParticle.getInstance().Identity().getCurrentUser()).thenReturn(user);
 
 
         Product product1 = new Product.Builder("product1", "1234", 0.0).build();
@@ -494,6 +534,96 @@ public class OptimizelyKitTests {
         public T value;
         public Mutable(T value) {
             this.value = value;
+        }
+    }
+
+    class EmptyMParticleUser implements MParticleUser {
+
+        @NonNull
+        @Override
+        public long getId() {
+            return 1L;
+        }
+
+        @NonNull
+        @Override
+        public Cart getCart() {
+            return null;
+        }
+
+        @NonNull
+        @Override
+        public Map<String, Object> getUserAttributes() {
+            return new HashMap<>();
+        }
+
+        @Nullable
+        @Override
+        public Map<String, Object> getUserAttributes(@Nullable UserAttributeListener userAttributeListener) {
+            userAttributeListener.onUserAttributesReceived(new HashMap<String, String>(), new HashMap<String, List<String>>(), getId());
+            return null;
+        }
+
+        @Override
+        public boolean setUserAttributes(@NonNull Map<String, Object> map) {
+            return false;
+        }
+
+        @NonNull
+        @Override
+        public Map<MParticle.IdentityType, String> getUserIdentities() {
+            return null;
+        }
+
+        @Override
+        public boolean setUserAttribute(@NonNull String s, @NonNull Object o) {
+            return false;
+        }
+
+        @Override
+        public boolean setUserAttributeList(@NonNull String s, @NonNull Object o) {
+            return false;
+        }
+
+        @Override
+        public boolean incrementUserAttribute(@NonNull String s, int i) {
+            return false;
+        }
+
+        @Override
+        public boolean removeUserAttribute(@NonNull String s) {
+            return false;
+        }
+
+        @Override
+        public boolean setUserTag(@NonNull String s) {
+            return false;
+        }
+
+        @NonNull
+        @Override
+        public ConsentState getConsentState() {
+            return null;
+        }
+
+        @Override
+        public void setConsentState(@Nullable ConsentState consentState) {
+
+        }
+
+        @Override
+        public boolean isLoggedIn() {
+            return false;
+        }
+
+        @Override
+        public long getFirstSeenTime() {
+            return 0;
+        }
+
+        @Override
+        public long getLastSeenTime() {
+            return 0;
         }
     }
 }

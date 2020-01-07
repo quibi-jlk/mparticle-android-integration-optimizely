@@ -6,6 +6,7 @@ import android.support.annotation.Nullable;
 
 import com.mparticle.MPEvent;
 import com.mparticle.MParticle;
+import com.mparticle.UserAttributeListener;
 import com.mparticle.commerce.CommerceEvent;
 import com.mparticle.identity.MParticleUser;
 import com.mparticle.internal.Logger;
@@ -127,25 +128,32 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
                 customUserId = userIdList.get(0);
             }
         }
-        OptimizelyEvent optimizelyEvent = getOptimizelyEvent(mpEvent, user);
-        if (optimizelyEvent == null) {
-            return null;
-        }
-        if (!MPUtility.isEmpty(valueString)) {
-            try {
-                Double value = Double.parseDouble(valueString);
-                optimizelyEvent.addEventAttribute("value", value);
-                Logger.debug(String.format("Applying custom value: \"%s\" to Optimizely Event based on customFlag", String.valueOf(value)));
-            } catch (NumberFormatException ex) {
-                Logger.error(String.format("Unable to log Optimizely Value \"%s\", failed to parse as a Double", valueString));
+        final String optimizelyCustomUserId = customUserId;
+        final String optimizelyValueString = valueString;
+        boolean eventCreated = getOptimizelyEvent(mpEvent, user, new OptimizelyEventCallback() {
+            @Override
+            public void onOptimizelyEventCreated(OptimizelyEvent optimizelyEvent) {
+                if (!MPUtility.isEmpty(optimizelyValueString)) {
+                    try {
+                        Double value = Double.parseDouble(optimizelyValueString);
+                        optimizelyEvent.addEventAttribute("value", value);
+                        Logger.debug(String.format("Applying custom value: \"%s\" to Optimizely Event based on customFlag", String.valueOf(value)));
+                    } catch (NumberFormatException ex) {
+                        Logger.error(String.format("Unable to log Optimizely Value \"%s\", failed to parse as a Double", optimizelyValueString));
+                    }
+                }
+                if (!MPUtility.isEmpty(optimizelyCustomUserId)) {
+                    optimizelyEvent.userId = optimizelyCustomUserId;
+                    Logger.debug(String.format("Applying custom userId: \"%s\" to Optimizely Event based on customFlag", optimizelyCustomUserId));
+                }
+                logOptimizelyEvent(optimizelyEvent);
             }
+        });
+        if (!eventCreated) {
+            return null;
+        } else {
+            return Collections.singletonList(ReportingMessage.fromEvent(this, mpEvent));
         }
-        if (!MPUtility.isEmpty(customUserId)) {
-            optimizelyEvent.userId = customUserId;
-            Logger.debug(String.format("Applying custom userId: \"%s\" to Optimizely Event based on customFlag", customUserId));
-        }
-        logOptimizelyEvent(optimizelyEvent);
-        return Collections.singletonList(ReportingMessage.fromEvent(this, mpEvent));
 
     }
 
@@ -161,7 +169,7 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
     }
 
     @Override
-    public List<ReportingMessage> logEvent(CommerceEvent commerceEvent) {
+    public List<ReportingMessage> logEvent(final CommerceEvent commerceEvent) {
         MParticleUser user = getCurrentUser();
         String customEventName = null;
         String customUserId = null;
@@ -177,40 +185,42 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         }
 
         List<MPEvent> events = CommerceEventUtils.expand(commerceEvent);
-
-        for (MPEvent event: events) {
-            OptimizelyEvent optimizelyEvent = getOptimizelyEvent(event, user);
-            if (optimizelyEvent == null) {
-                continue;
-            }
-            //If the event is a Purchase or Refund expanded event
-            if (commerceEvent.getProductAction() != null && event.getEventName().equals(String.format(CommerceEventUtils.PLUSONE_NAME, commerceEvent.getProductAction()))) {
-                //parse and apply the "revenue"
-                String totalAmountString = event.getInfo().get(CommerceEventUtils.Constants.ATT_TOTAL);
-                if (!MPUtility.isEmpty(totalAmountString)) {
-                    try {
-                        Double totalAmount = Double.valueOf(totalAmountString);
-                        if (totalAmount != null) {
-                            Integer revenueInCents = Double.valueOf(totalAmount * 100).intValue();
-                            optimizelyEvent.eventAttributes.put("revenue", revenueInCents);
-                            Logger.debug(String.format("Applying revenue: \"%s\" to Optimizely Event based on transactionAttributes", revenueInCents));
+        final String optimizelyCustomEventName = customEventName;
+        final String optimizelyCustomUserId = customUserId;
+        for (final MPEvent event: events) {
+            getOptimizelyEvent(event, user, new OptimizelyEventCallback() {
+                @Override
+                public void onOptimizelyEventCreated(OptimizelyEvent optimizelyEvent) {
+                    //If the event is a Purchase or Refund expanded event
+                    if (commerceEvent.getProductAction() != null && event.getEventName().equals(String.format(CommerceEventUtils.PLUSONE_NAME, commerceEvent.getProductAction()))) {
+                        //parse and apply the "revenue"
+                        String totalAmountString = event.getInfo().get(CommerceEventUtils.Constants.ATT_TOTAL);
+                        if (!MPUtility.isEmpty(totalAmountString)) {
+                            try {
+                                Double totalAmount = Double.valueOf(totalAmountString);
+                                if (totalAmount != null) {
+                                    Integer revenueInCents = Double.valueOf(totalAmount * 100).intValue();
+                                    optimizelyEvent.eventAttributes.put("revenue", revenueInCents);
+                                    Logger.debug(String.format("Applying revenue: \"%s\" to Optimizely Event based on transactionAttributes", revenueInCents));
+                                }
+                            } catch (NumberFormatException ex) {
+                                Logger.error("Unable to parse Revenue value");
+                            }
                         }
-                    } catch (NumberFormatException ex) {
-                        Logger.error("Unable to parse Revenue value");
+                        //And apply the custom name, if there is one
+                        if (optimizelyCustomEventName != null) {
+                            optimizelyEvent.eventName = optimizelyCustomEventName;
+                            Logger.debug(String.format("Applying custom eventName: \"%s\" to Optimizely Event based on customFlag", optimizelyCustomEventName));
+                        }
                     }
+                    //Apply customId, if there is one, to all expanded events
+                    if (optimizelyCustomUserId != null) {
+                        optimizelyEvent.userId = optimizelyCustomUserId;
+                        Logger.debug(String.format("Applying custom userId: \"%s\" to Optimizely Event based on customFlag", optimizelyCustomUserId));
+                    }
+                    logOptimizelyEvent(optimizelyEvent);
                 }
-                //And apply the custom name, if there is one
-                if (customEventName != null) {
-                    optimizelyEvent.eventName = customEventName;
-                    Logger.debug(String.format("Applying custom eventName: \"%s\" to Optimizely Event based on customFlag", customEventName));
-                }
-            }
-            //Apply customId, if there is one, to all expanded events
-            if (customUserId != null) {
-                optimizelyEvent.userId = customUserId;
-                Logger.debug(String.format("Applying custom userId: \"%s\" to Optimizely Event based on customFlag", customUserId));
-            }
-            logOptimizelyEvent(optimizelyEvent);
+            });
         }
         return Collections.singletonList(ReportingMessage.fromEvent(this, commerceEvent));
     }
@@ -275,23 +285,39 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         return userId;
     }
 
-    private OptimizelyEvent getOptimizelyEvent(MPEvent mpEvent, MParticleUser user) {
-        OptimizelyEvent event = new OptimizelyEvent();
-        Map<String, String> userAttributes = getUserAttributesStringMap(user);
-        String eventName = mpEvent.getEventName();
-        String userId = getUserId(user);
+    private Boolean getOptimizelyEvent(final MPEvent mpEvent, final MParticleUser user, final OptimizelyEventCallback onEventCreated) {
+        if (!MPUtility.isEmpty(getUserId(user))) {
+            com.mparticle.UserAttributeListener listener = new com.mparticle.UserAttributeListener() {
+                @Override
+                public void onUserAttributesReceived(@Nullable Map<String, String> userAttributes, @Nullable Map<String, List<String>> userAttributeLists, @Nullable Long aLong) {
+                    Map<String, String> attributes = new HashMap<>();
+                    for (Map.Entry<String, String> entry : userAttributes.entrySet()) {
+                        attributes.put(entry.getKey(), entry.getValue());
+                    }
 
-        if (MPUtility.isEmpty(userId)) {
-            return null;
-        }
 
-        event.eventName = eventName;
-        event.userId = userId;
-        event.userAttributes = userAttributes;
-        if (mpEvent.getInfo() != null) {
-            event.eventAttributes = new HashMap<String, Object>(mpEvent.getInfo());
+                    OptimizelyEvent event = new OptimizelyEvent();
+                    String eventName = mpEvent.getEventName();
+                    String userId = getUserId(user);
+
+                    event.eventName = eventName;
+                    event.userId = userId;
+                    event.userAttributes = attributes;
+                    if (mpEvent.getCustomAttributes() != null) {
+                        event.eventAttributes = new HashMap<String, Object>(mpEvent.getInfo());
+                    }
+                    onEventCreated.onOptimizelyEventCreated(event);
+                }
+            };
+            if (user != null) {
+                user.getUserAttributes(listener);
+            } else {
+                listener.onUserAttributesReceived(new HashMap<String, String>(), new HashMap<String, List<String>>(), null);
+            }
+            return true;
+        } else {
+            return false;
         }
-        return event;
     }
 
     private void queueEvent(OptimizelyEvent event) {
@@ -307,16 +333,7 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         }
     }
 
-    private Map<String, String> getUserAttributesStringMap(MParticleUser user) {
-        Map<String, String> attributes = new HashMap<>();
-        if (user == null) {
-            return attributes;
-        }
-        for (Map.Entry<String, Object> entry: user.getUserAttributes().entrySet()) {
-            attributes.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString(): null);
-        }
-        return attributes;
-    }
+
 
     private Long tryParse(String value) {
         try {
@@ -342,5 +359,9 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
 
     public interface OptimizelyClientListener {
         void onOptimizelyClientAvailable(OptimizelyClient optimizelyClient);
+    }
+
+    private interface OptimizelyEventCallback {
+        void onOptimizelyEventCreated(OptimizelyEvent event);
     }
 }
