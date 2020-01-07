@@ -30,7 +30,7 @@ import java.util.Queue;
 public class OptimizelyKit extends KitIntegration implements KitIntegration.EventListener, KitIntegration.CommerceListener, OptimizelyStartListener {
     private static boolean providedClient = false;
     private static OptimizelyClient mOptimizelyClient;
-    private static List<WeakReference<OptimizelyClientListener>> mStartListeners = new ArrayList<>();
+    private static List<OptimizelyClientListener> mStartListeners = new ArrayList<>();
 
     protected final Queue<OptimizelyEvent> mEventQueue = new LinkedList<>();
     final static String USER_ID_FIELD_KEY = "userIdField";
@@ -80,11 +80,16 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         return mOptimizelyClient;
     }
 
+    /**
+     * Add a single use callback for Optimizely Client startup. Your listener will be automatically
+     * removed after it is invoked. To remove it earlier, simply null our your reference
+     * @param startListener
+     */
     public static void getOptimizelyClient(OptimizelyClientListener startListener) {
         if (mOptimizelyClient != null) {
             startListener.onOptimizelyClientAvailable(mOptimizelyClient);
         } else {
-            mStartListeners.add(new WeakReference<>(startListener));
+            mStartListeners.add(startListener);
         }
     }
 
@@ -238,16 +243,17 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
         if (!providedClient && optimizelyClient != null && optimizelyClient.isValid()) {
             mOptimizelyClient = optimizelyClient;
             if (mStartListeners != null) {
-                for (WeakReference<OptimizelyClientListener> listener : mStartListeners) {
+                for (OptimizelyClientListener listener : mStartListeners) {
                     try {
-                        if (listener.get() != null) {
-                            listener.get().onOptimizelyClientAvailable(mOptimizelyClient);
+                        if (listener != null) {
+                            listener.onOptimizelyClientAvailable(mOptimizelyClient);
                         }
                     } catch (Exception e) {
 
                     }
                 }
             }
+            mStartListeners.clear();
             replayQueue();
         }
     }
