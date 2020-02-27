@@ -27,5 +27,5 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     testImplementation files('libs/java-json.jar')
     testImplementation files('libs/test-utils.aar')
-    testImplementation 'org.mockito:mockito-core:3.1.0'
+    testImplementation 'org.mockito:mockito-core:3.3.1'
 }
