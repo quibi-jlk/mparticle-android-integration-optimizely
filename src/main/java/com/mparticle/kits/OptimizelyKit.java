@@ -40,6 +40,10 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
 
     final static String USER_ID_CUSTOMER_ID_VALUE = "customerId";
     final static String USER_ID_EMAIL_VALUE = "email";
+    final static String USER_ID_OTHER_VALUE = "otherid";
+    final static String USER_ID_OTHER2_VALUE = "otherid2";
+    final static String USER_ID_OTHER3_VALUE = "otherid3";
+    final static String USER_ID_OTHER4_VALUE = "otherid4";
     final static String USER_ID_MPID_VALUE = "mpid";
     final static String USER_ID_DAS_VALUE = "deviceApplicationStamp";
 
@@ -278,6 +282,14 @@ public class OptimizelyKit extends KitIntegration implements KitIntegration.Even
                 userId = user.getUserIdentities().get(MParticle.IdentityType.CustomerId);
             } else if (USER_ID_EMAIL_VALUE.equalsIgnoreCase(userIdField)) {
                 userId = user.getUserIdentities().get(MParticle.IdentityType.Email);
+            } else if (USER_ID_OTHER_VALUE.equalsIgnoreCase(userIdField)) {
+                userId = user.getUserIdentities().get(MParticle.IdentityType.Other);
+            } else if (USER_ID_OTHER2_VALUE.equalsIgnoreCase(userIdField)) {
+                userId = user.getUserIdentities().get(MParticle.IdentityType.Other2);
+            } else if (USER_ID_OTHER3_VALUE.equalsIgnoreCase(userIdField)) {
+                userId = user.getUserIdentities().get(MParticle.IdentityType.Other3);
+            } else if (USER_ID_OTHER4_VALUE.equalsIgnoreCase(userIdField)) {
+                userId = user.getUserIdentities().get(MParticle.IdentityType.Other4);
             } else if (USER_ID_MPID_VALUE.equalsIgnoreCase(userIdField)) {
                 userId = Long.toString(user.getId());
             } else if (USER_ID_DAS_VALUE.equalsIgnoreCase(userIdField)) {
